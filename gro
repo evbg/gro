@@ -1,0 +1,156 @@
+#!/bin/sh
+#                                 G  R  O
+#
+# MIT License
+#
+# Copyright (c) 2019 Evgeny V. Bogodukhov
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+VERSION=0.1.0
+
+BIN_DIR="$HOME/bin"
+SYSTEM_BIN_DIR="/usr/local/bin"
+
+help() {
+    cat << EOF
+gro - management utility for a group of local git repositories
+located in the current directory
+
+Usage:  gro [ options ] - backs up to parent directory
+        gro { -h } - displays help
+        gro { -ls } - prints the list of addresses of remote git repositories
+        for all local repositories in the current folder.
+Options:
+      -v|--verbose  Verbose mode
+      -n|--dry-run  Dry run mode
+EOF
+    if [ "${SHOW_HELP}" ]; then
+    cat << EOF
+EOF
+    fi
+    cat << EOF
+gro ${VERSION}
+EOF
+}
+
+# Helpers
+exit_with_msg() { printf '%s\n' "$1"; exit 0; }
+
+
+list_remote_origin_url() {
+    for dir in *
+    do
+        url=$([ -d "${dir}" ] && [ -d "${dir}/.git" ] && git --git-dir "${dir}/.git" config --get remote.origin.url)
+	      if [ -n "${url}" ]; then
+		        echo "${dir} - ${url}"
+	      fi
+    done
+}
+
+
+self_install() {
+    INSTALL_DIR="${BIN_DIR}"
+    if test -w "${TARGET_DIR}"; then
+        INSTALL_DIR="${TARGET_DIR}"
+    fi
+    if [ "${GLOBAL_INSTALL}" ]; then
+        INSTALL_DIR="${SYSTEM_BIN_DIR}"
+    fi
+    if test -w "${INSTALL_DIR}"; then
+        echo "Copying $0 to '${INSTALL_DIR}'...";
+        cp "$0" "${INSTALL_DIR}";
+        echo "Done."
+    else
+        echo "${INSTALL_DIR} is not writable";
+    fi
+}
+
+make_symlinks() {
+    _bin_gro=$(command -v "${BASE0}")
+    if [ ! "${_bin_gro}" ]; then
+        echo "gro executable not found"; exit 0;
+    fi
+    if [ "${TARGET_DIR}" ]; then
+        _ldir="${TARGET_DIR}"
+    else
+        _ldir="${BIN_DIR}"
+    fi
+    _f=${1:-i}
+    _ln_() { ln -s "-${_f}" "${_bin_gro}" "${_ldir}/${1}"; }
+    if test -w "${BIN_DIR}"; then
+        echo "Making symbolic links for '${_bin_gro}' in '${_ldir}' directory";
+        if test -e "${_bin_gro}"; then
+            for c in "grols"; do _ln_ "$c"; done
+            echo "Done."
+        fi
+    else
+        echo "${BIN_DIR} is not writable";
+    fi
+}
+
+make_symlinks_f() { make_symlinks "f"; }
+
+main() {
+    while [ $# -gt 0 ]; do
+        P=$1;
+        shift
+        case ${P} in
+i   |  -i  | --self-install                   ) export _E="self_install"                     ;;
+ia  | -ia  | --self-install-with-symlinks     ) export _E="self_install make_symlinks"       ;;
+iaf | --self-install-with-symlinks-force      ) export _E="self_install make_symlinks_f"     ;;
+g   |  -g  | --global                         ) export GLOBAL_INSTALL="1"                    ;;
+ls  | -ls  | grols                            ) export _E="list_remote_origin_url"           ;;
+v   |  -v  | --verbose                        ) export GRO_VERBOSE="v"                       ;;
+d   |  -d  | --debug                          ) export GRO_DEBUG="1"                         ;;
+n   |  -n  | --dry-run                        ) export DRY_RUN="1"; export GRO_DEBUG="1"     ;;
+gro                                           ) export _E="help"                             ;;
+h   |  -h  | --help                           ) export _E="help";
+                                                export SHOW_HELP="1"                         ;;
+*) exit_with_msg "grols: Option '${P}' is not supported"                                     ;;
+        esac
+    done
+    if [ "x${_E}" = "x" ]; then
+        _E="help"
+    fi
+
+    set - ${_E};
+    for _e do
+        if [ ${GRO_DEBUG} ]; then
+            echo "DEBUG INFO:";
+            echo "------------------------------------------------";
+            echo "\$GRO_VERBOSE:   '${GRO_VERBOSE}'";
+            echo "Running command: '${_e}'";
+            echo "------------------------------------------------";
+        fi
+        if [ ! ${DRY_RUN} ]; then
+            ${_e};
+        else
+            echo "DRY RUN: '${_e}'";
+        fi
+    done
+    exit 0;
+}
+
+BASE0=$(basename "$0");
+set - "${BASE0}" "$@";
+
+if [ ! "x${BASE0}" = "xgro_test.sh" ]; then
+    main "$@";
+fi
