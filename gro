@@ -33,10 +33,9 @@ help() {
 gro - management utility for a group of local git repositories
 located in the current directory
 
-Usage:  gro [ options ] - backs up to parent directory
-        gro { -h } - displays help
-        gro { -ls } - prints the list of addresses of remote git repositories
-        for all local repositories in the current folder.
+Usage:  gro { -h } - displays help
+        gro { -ls }[ options ] - prints the list of addresses of remote git repositories
+        for all local repositories in the current directory.
 Options:
       -v|--verbose  Verbose mode
       -n|--dry-run  Dry run mode
